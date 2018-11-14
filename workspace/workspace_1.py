@@ -42,10 +42,8 @@ G.add_edges_from([("x", "y"),
                   ("z", "y")])
 
 G = populate_attributes(G)
-
-
-
 H = calculate_H(G)
+
 mean(H)
 covariance(H)
 
@@ -63,12 +61,20 @@ covariance(H).subs(
 
 
 variables = ["y"]
-conditionants = ["x"]
+conditionants = ["x", "z"]
 
 cond = conditionals(variables, conditionants, H)
 cond["mean"]
 cond["cov"]
 
 var = sympy.collect(sympy.expand(cond["mean"][0]), "x").coeff("x", 1)
-sympy.cancel(var)
+sympy.cancel(var).subs(
+        {"beta_z" : 1,
+         "beta_y" : 1,
+         "beta_x" : 1,
+         "beta_zy" : 1,
+         "beta_zx" : 1,
+         "sigma_z" : 1,
+         "sigma_x" : 1,
+         "sigma_y" : 1})
 

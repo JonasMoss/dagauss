@@ -89,11 +89,13 @@ def covariance(H):
         
     return M
     
-def conditionals(variables, conditionants, G):
+def conditionals(variables, conditionants, H):
     
-    cov = covariance_matrix(G)
-    mean = mean_vector(G)
-    V = list(networkx.topological_sort(G))
+    cov = covariance(H)
+    mean_ = mean(H)
+    
+    V = H.graph["sort"]
+    
     variables_indices = [V.index(var) for var in variables]
     conditionants_indices = [V.index(var) for var in conditionants]
     
@@ -102,8 +104,8 @@ def conditionals(variables, conditionants, G):
     cov_AB = cov[variables_indices, conditionants_indices]
     cov_BA = cov[conditionants_indices, variables_indices]
     cov_BB_inv = sympy.Inverse(cov[conditionants_indices, conditionants_indices])
-    mean_A = sympy.Matrix([mean[index] for index in variables_indices])
-    mean_B = sympy.Matrix([mean[index] for index in conditionants_indices])
+    mean_A = sympy.Matrix([mean_[index] for index in variables_indices])
+    mean_B = sympy.Matrix([mean_[index] for index in conditionants_indices])
     conditionants = sympy.Matrix(conditionants)
     
     # Fix ordering here!
