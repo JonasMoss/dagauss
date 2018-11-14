@@ -1,0 +1,29 @@
+% example.tex
+%
+% Copyright (C) 2010,2011 Laura Dietz
+% Copyright (C) 2012 Jaakko Luttinen
+%
+% This file may be distributed and/or modified
+%
+% 1. under the LaTeX Project Public License and/or
+% 2. under the GNU General Public License.
+%
+% See the files LICENSE_LPPL and LICENSE_GPL for more details.
+
+\documentclass[convert={outfile=\jobname.svg}]{standalone}
+
+\usepackage{tikz}
+\usetikzlibrary{bayesnet}
+
+\begin{document}
+\tikz{
+ \node[latent] (x) {$x$};%
+ \node[latent, right=of x] (y) {$y$};%
+ \node[latent, below=of x] (z) {$z$};%
+			
+
+ \edge {x} {y} 
+ \edge {x, y} {z} 
+}
+
+\end{document}
