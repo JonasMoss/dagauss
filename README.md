@@ -5,13 +5,13 @@ dagauss: Multivariate Gaussian DAGs
 
 Use this module to investigate multivariate Gaussian DAGs. Take the following simple collider:
 
-![image](docs/images/simple_collider.pdf)
+![image](docs/images/simple_collider.png)
 
 What happens to the estimate of regression coefficient of `x` on `y` when we condition on `z`?
 
 Or take the similar problem with a confounder:
 
-![image](docs/images/simple_collider.pdf)
+![image](docs/images/simple_confounder.png)
 
 What happens to the estimate of regression coefficient of `x` on `y` when we do not condition on `z`?
 
