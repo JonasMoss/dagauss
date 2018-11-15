@@ -12,10 +12,10 @@ sympy.init_printing(use_unicode = True)
 def populate_attributes(G):
     """ Populates a directed graph G with attributes. """
     for node in G.nodes:
-        G.nodes[node]["beta"] = sympy.Symbol("beta_" + node)
-        G.nodes[node]["sigma"] = sympy.Symbol("sigma_" + node)
+        G.nodes[node]["beta"] = sympy.Symbol("beta_" + node, real = True )
+        G.nodes[node]["sigma"] = sympy.Symbol("sigma_" + node, positive = True)
     for edge in G.edges:
-        G.edges[edge]["beta"] = sympy.Symbol("beta_" + edge[0] + edge[1])
+        G.edges[edge]["beta"] = sympy.Symbol("beta_" + edge[0] + edge[1], real = True)
     return G
 
 def calculate_H(G):
@@ -78,16 +78,21 @@ def mean(H):
     V = H.graph["sort"]
     return sympy.Matrix([H.nodes[v]["mu"] for v in V])
 
-def covariance(H):
+def covariance(H, variables = []):
     V = H.graph["sort"]
-    
+
     k = len(H)
     M = sympy.zeros(k, k)
     
     for (i, j) in product(range(0, k), range(0, k)):
         M[i, j] = H.edges[(V[i], V[j])]["psi"]
         
-    return M
+    if(not variables):
+        return M
+    else:
+        variables_indices = [V.index(var) for var in variables]
+        return M[variables_indices, variables_indices]
+    
     
 def conditionals(variables, conditionants, H):
     
@@ -98,7 +103,6 @@ def conditionals(variables, conditionants, H):
     
     variables_indices = [V.index(var) for var in variables]
     conditionants_indices = [V.index(var) for var in conditionants]
-    
     
     cov_AA = cov[variables_indices, variables_indices]
     cov_AB = cov[variables_indices, conditionants_indices]
