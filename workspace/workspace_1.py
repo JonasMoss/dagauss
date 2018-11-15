@@ -35,11 +35,11 @@ G.add_edge("x", "y", beta = sympy.Symbol("beta_xy"))
 G.add_edge("z", "x", beta = sympy.Symbol("beta_zx"))
 G.add_edge("z", "y", beta = sympy.Symbol("beta_zy"))
 
-G = nx.DiGraph()
+G = networkx.DiGraph()
 G.add_nodes_from(["x", "y", "z"])
 G.add_edges_from([("x", "y"),
-                  ("z", "x"),
-                  ("z", "y")])
+                  ("x", "z"),
+                  ("y", "z")])
 
 G = populate_attributes(G)
 H = calculate_H(G)
