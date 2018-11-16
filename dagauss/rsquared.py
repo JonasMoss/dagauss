@@ -1,4 +1,18 @@
-def rsquared(H, variables, conditionants):
+def collect_betas(conditional_means, covariates):
+    def collect(index):
+        expr = sympy.expand(conditional_means[index])
+        return sympy.collect(expr = expr, 
+                             syms = covariates)
+        
+    collections = [collect(index) for index in range(len(conditional_means))]
+    
+    betas = sympy.Matrix([collection.coeff(covariates) for 
+                          collection, covariates in 
+                          product(collections, covariates)])
+        
+    return betas.reshape(len(collections), len(covariates)).T
+
+def rsquared(H, responses, covariates, conditionants):
     """ Calculates the theoretical R squared. 
 
     This function calculates R squared, also known as the coefficient of 
@@ -18,20 +32,30 @@ def rsquared(H, variables, conditionants):
         >>> print [x + 3 for x in a]
         [4, 5, 6]
     """
-    Rsq = 0
-    for variable in variables:
-        conditions = conditionals(variable, conditionants, H)
-        collected = sympy.collect(sympy.expand(conditions["mean"][0]), conditionants)
-        betas = sympy.Matrix([collected.coeff(conditionant, 1) for conditionant in conditionants])
-        residual = sympy.simplify(conditions["cov"][0])
-        V = H.graph["sort"]
-        conditionants_indices = [V.index(var) for var in conditionants]
-        cov = covariance(H)[conditionants_indices, conditionants_indices]
-        var = sympy.simplify((betas.T*cov*betas)[0])
-        Rsq = Rsq + sympy.simplify(var/(residual + var))
     
-    return Rsq/len(variables)
+    order = H.graph["sort"]
     
+    responses = list(set(responses))
+    conditionants = list(set(conditionants))
+    covariates = list(set(covariates).difference(set(conditionants)))
+    covariates_and_conditionants = list(set(covariates).union(set(conditionants)))
+    
+    cov_given_conditionants = covariance(H, responses = responses, covariates = conditionants)
+    cov_covariates_given_conditionants = covariance(H, responses = covariates, covariates = conditionants)
+    mean_given_covariates_and_conditionants = mean(H, responses, covariates_and_conditionants)
+    betas = collect_betas(mean_given_covariates_and_conditionants, covariates)
+    
+    if(len(cov_covariates_given_conditionants) is 1):
+        cov_expected_responses_given_convariates_and_conditionants = betas*betas.T*cov_covariates_given_conditionants[0]
+    else:
+        cov_expected_responses_given_convariates_and_conditionants  = betas.T*cov_covariates_given_conditionants*betas
+
+    return sympy.trace(cov_expected_responses_given_convariates_and_conditionants)/sympy.trace(cov_given_conditionants )
+    
+
+
+
+
 def correlation(H, variables = [], conditionants = []):
     """ Calculates the conditional correlation between variable1 and variable2
         given the conditionants. 
