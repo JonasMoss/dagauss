@@ -42,7 +42,6 @@ def calculate_H(G):
     """
     V = list(networkx.topological_sort(G))
     H = G.to_undirected()
-    H.graph["sort"] = V
 
     # This loop takes care of the means of the unconditional model.
     for v in V:
@@ -71,62 +70,61 @@ def calculate_H(G):
             contribution = sum([H.edges[edge]["beta"]*H.edges[(edge[0], w)]["psi"] for edge in edges])
             H.add_edge(v, w, psi = contribution)
             
+    H.graph["sort"] = list(set(V))
+    H.graph["sort"].sort()
     return H
 
 
-def mean(H):
-    V = H.graph["sort"]
-    return sympy.Matrix([H.nodes[v]["mu"] for v in V])
 
-def covariance(H, variables = []):
-    V = H.graph["sort"]
-
-    k = len(H)
-    M = sympy.zeros(k, k)
     
-    for (i, j) in product(range(0, k), range(0, k)):
-        M[i, j] = H.edges[(V[i], V[j])]["psi"]
+def cov_and_mean(H, responses = [], covariates = []):
+    
+    def unconditional_covariance(H, responses = []):
+        if(not responses): responses = H.graph["sort"]
+        V = list(set(H.graph["sort"]).intersection(set(responses)))
+    
+        M = sympy.zeros(len(V), len(V))
+    
+        for (i, j) in product(range(len(V)), range(len(V))):
+            M[i, j] = H.edges[(V[i], V[j])]["psi"]
         
-    if(not variables):
         return M
-    else:
-        variables_indices = [V.index(var) for var in variables]
-        return M[variables_indices, variables_indices]
+
+    def unconditional_mean(H, responses = []):
+        if(not responses): responses = H.graph["sort"]
+        V = set(H.graph["sort"]).intersection(set(responses))
+        return sympy.Matrix([H.nodes[v]["mu"] for v in V])
+         
+    if(not responses): 
+        responses = list(set(H.graph["sort"]).difference(set(covariates)))
     
-    
-def conditionals(variables, conditionants, H):
-    
-    cov = covariance(H)
+    if(not covariates):
+        return {"mean": unconditional_mean(H, responses), 
+                "cov": unconditional_covariance(H, responses)}
+        
+    cov = unconditional_covariance(H)
     mean_ = mean(H)
-    
     V = H.graph["sort"]
     
-    variables_indices = [V.index(var) for var in variables]
-    conditionants_indices = [V.index(var) for var in conditionants]
+    responses_indices = [V.index(var) for var in responses]
+    covariates_indices = [V.index(var) for var in covariates]
     
-    cov_AA = cov[variables_indices, variables_indices]
-    cov_AB = cov[variables_indices, conditionants_indices]
-    cov_BA = cov[conditionants_indices, variables_indices]
-    cov_BB_inv = sympy.Inverse(cov[conditionants_indices, conditionants_indices])
-    mean_A = sympy.Matrix([mean_[index] for index in variables_indices])
-    mean_B = sympy.Matrix([mean_[index] for index in conditionants_indices])
-    conditionants = sympy.Matrix(conditionants)
-    
-    # Fix ordering here!
-    new_mean = mean_A + cov_AB*cov_BB_inv*(conditionants - mean_B)
+    cov_AA = cov[responses_indices, responses_indices]
+    cov_AB = cov[responses_indices, covariates_indices]
+    cov_BA = cov[covariates_indices, responses_indices]
+    cov_BB_inv = sympy.Inverse(cov[covariates_indices, covariates_indices])
+    mean_A = sympy.Matrix([mean_[index] for index in responses_indices])
+    mean_B = sympy.Matrix([mean_[index] for index in covariates_indices])
+    covariates = sympy.Matrix(covariates)
+
+    new_mean = mean_A + cov_AB*cov_BB_inv*(covariates - mean_B)
     new_cov  = cov_AA - cov_AB*cov_BB_inv*cov_BA
     return {"mean": sympy.simplify(new_mean), 
             "cov": sympy.simplify(new_cov)}
 
-def new_graph(H, G):
-    """ Make a DAG with the same parameters the same parameters as an old one. 
+
+def mean(H, responses = [], covariates = []): 
+    return cov_and_mean(H, responses = responses, covariates = covariates)["mean"]
     
-    Raises an error of the conditional independence structure of H is 
-        incompatible with that of G. 
-        
-    Args:
-        H (networkx.DiGraph): An object inheriting from DiGraph fiving the 
-        G (DagNormal): A DagNormal object representing a multivariate normal.
-    """
-    return None
-    
+def covariance(H, responses = [], covariates = []): 
+    return cov_and_mean(H, responses = responses, covariates = covariates)["cov"]
