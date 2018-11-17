@@ -21,7 +21,7 @@ G.add_edges_from([("x", "y"),
                   ("w", "x")])
 to_dag(G)
 
-responses = ["x"]
+responses = ["y", "x"]
 covariates = ["z", "w"]
 conditionants = []
 
@@ -29,15 +29,15 @@ subs =  {"beta_x"  : 0,
          "beta_y"  : 0,
          "beta_z"  : 0,
          "beta_w"  : 0,
-         "beta_xy" : -1,
-         "beta_zx" : 1,
-         "beta_wx" : 1,
+#         "beta_xy" : -1,
+#         "beta_zx" : 1,
+#         "beta_wx" : 1,
          "sigma_x" : 1,
          "sigma_y" : 1,
          "sigma_z" : 1,
          "sigma_w" : 1}
 
-rsqsign(G, responses, covariates)
+rsqsign(G, responses, covariates).subs(subs)
 
 (sympy.simplify(A[:, 0].dot(B[:, 0]) + A[:, 1].dot(B[:, 1]))/(A.norm()*B.norm())).subs(subs)
 
