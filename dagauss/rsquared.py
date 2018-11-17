@@ -1,18 +1,26 @@
-def beta(G, responses = [], covariates = []):
-    conditional_means = mean(G, responses, covariates)
+def beta(G, responses = [], covariates = [], conditionants = []):
+    variables = covariates + conditionants    
+    
+    conditional_means = mean(G, responses, variables)
     
     def collect(index):
         expr = sympy.expand(conditional_means[index])
         return sympy.collect(expr = expr, 
-                             syms = covariates)
+                             syms = variables)
         
     collections = [collect(index) for index in range(len(conditional_means))]
     
-    betas = sympy.Matrix([collection.coeff(covariates) for 
-                          collection, covariates in 
-                          product(collections, covariates)])
+    betas = sympy.Matrix([collection.coeff(variables) for 
+                          collection, variables in 
+                          product(collections, variables)])
     
-    return betas.reshape(len(collections), len(covariates)).T
+    betas.reshape(len(collections), len(variables)).T
+    
+    indices = variable_indices(G, values = covariates, 
+                                  restrictions = variables, 
+                                  sort = True)
+    
+    return betas[indices, :]
 
 def rsquared(G, responses, covariates, conditionants = [], norm = None):
     """ Calculates the theoretical R squared. 
@@ -38,20 +46,13 @@ def rsquared(G, responses, covariates, conditionants = [], norm = None):
     
     cov = variance(G, responses = covariates, 
                       covariates = conditionants)
-    
-    # The indices are used to pick the correct values out of the beta vector. 
-    # We need this because the natural set of covariates, covariates + 
-    # conditionants, includes conditionants we do not wish to keep when we
-    # calculate the variance of the conditional expectation.
-    
-    indices = variable_indices(G, values = covariates, 
-                                  restrictions = covariates + conditionants, 
-                                  sort = True)
-    
+
     betas = beta(G, responses = responses, 
-                    covariates = covariates + conditionants)[indices, :]
+                    covariates = covariates,
+                    conditionants = conditionants)
 
     top = betas.T*cov*betas
+    
     bottom = covariance(G, responses = responses, 
                            covariates = conditionants)
     
