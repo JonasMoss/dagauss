@@ -3,22 +3,42 @@
 from itertools import product
 import sympy
 import networkx 
+import copy
 
 sympy.init_printing(use_unicode = True)
 
-# This should be made into a method of the DagNormal class.
+# This should be made into a method.
+
+def get_order(G, values = [], keep = False):
+    
+    H = G.graph["dependency_graph"]
+    
+    order = copy.deepcopy(H.graph["sort"])
+    
+    if not values: return order
+    
+    if keep == False:
+        for value in values: 
+            order.remove(value)
+            
+    else:
+        for value in set(order).difference(values): 
+            order.remove(value)
+            
+    return order
 
 
-def populate_attributes(G):
-    """ Populates a directed graph G with attributes. """
-    for node in G.nodes:
-        G.nodes[node]["beta"] = sympy.Symbol("beta_" + node, real = True )
-        G.nodes[node]["sigma"] = sympy.Symbol("sigma_" + node, positive = True)
-    for edge in G.edges:
-        G.edges[edge]["beta"] = sympy.Symbol("beta_" + edge[0] + edge[1], real = True)
-    return G
+def variable_indices(G, values, restrictions = [], sort = False):
+    if(not restrictions):
+        restrictions = get_order(G)
+    order = get_order(G, restrictions, keep = True)
+    indices = [order.index(value) for value in values]
+    if sort: indices.sort()
+    return indices
 
-def calculate_H(G):
+# This is the ___init___ method.
+    
+def to_dag(G):
     """ Calculate the unconditional mean vector of a multivariate normal DAG.
 
     This function calculates the mean vector of a multivariate normal DAG. It
@@ -41,8 +61,15 @@ def calculate_H(G):
 
     """
     V = list(networkx.topological_sort(G))
-    H = G.to_undirected()
 
+    """ Populates a directed graph G with attributes. """
+    for node in G.nodes:
+        G.nodes[node]["beta"] = sympy.Symbol("beta_" + node, real = True )
+        G.nodes[node]["sigma"] = sympy.Symbol("sigma_" + node, positive = True)
+    for edge in G.edges:
+        G.edges[edge]["beta"] = sympy.Symbol("beta_" + edge[0] + edge[1], real = True)
+
+    H = G.to_undirected()
     # This loop takes care of the means of the unconditional model.
     for v in V:
         edges = list(G.in_edges(v))
@@ -72,42 +99,30 @@ def calculate_H(G):
             
     H.graph["sort"] = list(set(V))
     H.graph["sort"].sort()
-    return H
-
-
-
+    G.graph["dependency_graph"] = H
     
-def cov_and_mean(H, responses = [], covariates = []):
+# This is the parameters() method.
+def parameters(G, responses = [], covariates = []):
     
-    def unconditional_covariance(H, responses = []):
-        if(not responses): responses = H.graph["sort"]
-        V = list(set(H.graph["sort"]).intersection(set(responses)))
-    
-        M = sympy.zeros(len(V), len(V))
-    
-        for (i, j) in product(range(len(V)), range(len(V))):
-            M[i, j] = H.edges[(V[i], V[j])]["psi"]
-        
-        return M
-
-    def unconditional_mean(H, responses = []):
-        if(not responses): responses = H.graph["sort"]
-        V = set(H.graph["sort"]).intersection(set(responses))
-        return sympy.Matrix([H.nodes[v]["mu"] for v in V])
-         
     if(not responses): 
-        responses = list(set(H.graph["sort"]).difference(set(covariates)))
-    
-    if(not covariates):
-        return {"mean": unconditional_mean(H, responses), 
-                "cov": unconditional_covariance(H, responses)}
+        responses = get_order(G, covariates)
         
-    cov = unconditional_covariance(H)
-    mean_ = mean(H)
-    V = H.graph["sort"]
+    H = G.graph["dependency_graph"]
+    order = get_order(G)
+    mean_ = sympy.Matrix([H.nodes[value]["mu"] for value in order])
+    cov = sympy.zeros(len(order), len(order))
+    for (i, j) in product(range(len(order)), range(len(order))):
+        cov[i, j] = H.edges[(order[i], order[j])]["psi"]
+
+    if(not covariates):
+        return {"mean": mean_[variable_indices(G, responses, sort = True), 0], 
+                "cov": cov[variable_indices(G, responses, sort = True), 
+                           variable_indices(G, responses, sort = True)]}
     
-    responses_indices = [V.index(var) for var in responses]
-    covariates_indices = [V.index(var) for var in covariates]
+    V = get_order(G)
+    
+    responses_indices = variable_indices(G, responses, sort = True)
+    covariates_indices = variable_indices(G, covariates, sort = True)
     
     cov_AA = cov[responses_indices, responses_indices]
     cov_AB = cov[responses_indices, covariates_indices]
@@ -115,16 +130,25 @@ def cov_and_mean(H, responses = [], covariates = []):
     cov_BB_inv = sympy.Inverse(cov[covariates_indices, covariates_indices])
     mean_A = sympy.Matrix([mean_[index] for index in responses_indices])
     mean_B = sympy.Matrix([mean_[index] for index in covariates_indices])
-    covariates = sympy.Matrix(covariates)
 
-    new_mean = mean_A + cov_AB*cov_BB_inv*(covariates - mean_B)
+    new_mean = mean_A + cov_AB*cov_BB_inv*(sympy.Matrix(covariates) - mean_B)
     new_cov  = cov_AA - cov_AB*cov_BB_inv*cov_BA
     return {"mean": sympy.simplify(new_mean), 
             "cov": sympy.simplify(new_cov)}
 
-
-def mean(H, responses = [], covariates = []): 
-    return cov_and_mean(H, responses = responses, covariates = covariates)["mean"]
+# This is the mean() method.
+def mean(G, responses = [], covariates = []): 
+    return parameters(G, responses = responses, covariates = covariates)["mean"]
     
-def covariance(H, responses = [], covariates = []): 
-    return cov_and_mean(H, responses = responses, covariates = covariates)["cov"]
+# This is the covariance() method.
+def covariance(G, responses = [], covariates = []): 
+    return parameters(G, responses = responses, covariates = covariates)["cov"]
+
+# The variance method picks the only item from the covariance matrix.
+def variance(G, responses = [], covariates = []):
+    if len(responses) == 1:
+        return parameters(G, responses = responses, 
+                             covariates = covariates)["cov"][0]
+    else:
+        return parameters(G, responses = responses, 
+                             covariates = covariates)["cov"]
