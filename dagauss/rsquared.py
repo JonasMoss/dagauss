@@ -1,4 +1,6 @@
-def collect_betas(conditional_means, covariates):
+def beta(G, responses = [], covariates = []):
+    conditional_means = mean(G, responses, covariates)
+    
     def collect(index):
         expr = sympy.expand(conditional_means[index])
         return sympy.collect(expr = expr, 
@@ -9,17 +11,18 @@ def collect_betas(conditional_means, covariates):
     betas = sympy.Matrix([collection.coeff(covariates) for 
                           collection, covariates in 
                           product(collections, covariates)])
-        
+    
     return betas.reshape(len(collections), len(covariates)).T
 
-def rsquared(H, responses, covariates, conditionants):
+def rsquared(G, responses, covariates, conditionants = [], norm = None):
     """ Calculates the theoretical R squared. 
 
     This function calculates R squared, also known as the coefficient of 
        determination. 
 
     Args:
-        G (DagNormal): A DagNormal object representing a multivariate normal.
+        G (DaGauss): A DaGauss object representing a multivariate normal.
+        responses: The 
 
     Returns:
         None: The function modifies G in place.
@@ -33,41 +36,38 @@ def rsquared(H, responses, covariates, conditionants):
         [4, 5, 6]
     """
     
-    order = H.graph["sort"]
+    cov = variance(G, responses = covariates, 
+                      covariates = conditionants)
     
-    responses = list(set(responses))
-    conditionants = list(set(conditionants))
-    covariates = list(set(covariates).difference(set(conditionants)))
-    covariates_and_conditionants = list(set(covariates).union(set(conditionants)))
+    # The indices are used to pick the correct values out of the beta vector. 
+    # We need this because the natural set of covariates, covariates + 
+    # conditionants, includes conditionants we do not wish to keep when we
+    # calculate the variance of the conditional expectation.
     
-    cov_given_conditionants = covariance(H, responses = responses, covariates = conditionants)
-    cov_covariates_given_conditionants = covariance(H, responses = covariates, covariates = conditionants)
-    mean_given_covariates_and_conditionants = mean(H, responses, covariates_and_conditionants)
-    betas = collect_betas(mean_given_covariates_and_conditionants, covariates)
+    indices = variable_indices(G, values = covariates, 
+                                  restrictions = covariates + conditionants, 
+                                  sort = True)
     
-    if(len(cov_covariates_given_conditionants) is 1):
-        cov_expected_responses_given_convariates_and_conditionants = betas*betas.T*cov_covariates_given_conditionants[0]
+    betas = beta(G, responses = responses, 
+                    covariates = covariates + conditionants)[indices, :]
+
+    top = betas.T*cov*betas
+    bottom = covariance(G, responses = responses, 
+                           covariates = conditionants)
+    
+    if(ord == "trace"):
+        return sympy.trace(top)/sympy.trace(bottom)
     else:
-        cov_expected_responses_given_convariates_and_conditionants  = betas.T*cov_covariates_given_conditionants*betas
-
-    return sympy.trace(cov_expected_responses_given_convariates_and_conditionants)/sympy.trace(cov_given_conditionants )
+        return top.norm(norm)/bottom.norm(norm)
     
 
 
-
-
-def correlation(H, variables = [], conditionants = []):
+def correlation(G, variables = [], conditionants = []):
     """ Calculates the conditional correlation between variable1 and variable2
         given the conditionants. 
 
     """
-    
-    if(not conditionants):
-        cov = covariance(H, variables)
-    else:
-        cov = conditionals(variables, conditionants, H)["cov"]
-        
-    cov = cov*sympy.fraction(cov[0, 0])[1]
+    cov = covariance(G, variables, conditionants)
     k = cov.shape[0]
     sds = sympy.Matrix([1/sympy.sqrt(cov[i, i]) for i 
                         in range(0, k)]*k).reshape(k, k)
@@ -75,150 +75,24 @@ def correlation(H, variables = [], conditionants = []):
     cor = cov.multiply_elementwise(sds).multiply_elementwise(sds.T)
     return cor.applyfunc(sympy.simplify)
     
-variables = ["y", "x"]
-conditionants = ["z"]
-condcor = conditional_correlation(H, variable1, variable2, conditionants)
-condcor.subs( 
-        {"beta_z"  : 0,
-         "beta_y"  : 0,
-         "beta_x"  : 0,
-         "beta_yz" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})
 
+def rsqsign(G, responses, covariates, conditionants = []):
+    cov = variance(G, responses = covariates, 
+                       covariates = conditionants)
 
-# With collider
-
-collider = networkx.DiGraph()
-collider.add_nodes_from(["x", "y", "z"])
-collider.add_edges_from([("x", "y"),
-                  ("x", "z"),
-                  ("y", "z")])
-
-collider = populate_attributes(collider)
-collider_H = calculate_H(collider)
-
-variables = ["y"]
-conditionants = ["x", "z"]
-collider_rsq_both = rsquared(collider_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_yz" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})
+    indices = variable_indices(G, values = covariates, 
+                              restrictions = covariates + conditionants, 
+                              sort = True)
     
-variables = ["y"]
-conditionants = ["x"]
-collider_rsq_one = rsquared(collider_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_yz" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})
- 
+    betas = beta(G, responses = responses, 
+                    covariates = covariates + conditionants)[indices, :]
 
-sympy.simplify(collider_rsq_both/collider_rsq_one)
+    bottom = variance(G, responses = responses, 
+                         covariates = conditionants + covariates)
 
-
-# With confounder
-
-confounder = networkx.DiGraph()
-confounder.add_nodes_from(["x", "y", "z"])
-confounder.add_edges_from([("x", "y"),
-                  ("z", "x"),
-                  ("z", "y")])
-
-confounder = populate_attributes(confounder)
-confounder_H = calculate_H(confounder)
-
-variables = ["y"]
-conditionants = ["x", "z"]
-confounder_rsq_both = rsquared(confounder_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_zy" : 1,
-         "beta_zx" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})
+    product_matrix = bottom*(cov*betas).T
+    grand_sum = 0
     
-
-variables = ["y"]
-conditionants = ["x"]
-confounder_rsq_one = rsquared(confounder_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_zy" : 1,
-         "beta_zx" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})    
+    for i in product_matrix: grand_sum += i
     
-
-# With nothing
-
-confounder = networkx.DiGraph()
-confounder.add_nodes_from(["x", "y", "z"])
-confounder.add_edges_from([("x", "y"),
-                  ("z", "x")])
-
-confounder = populate_attributes(confounder)
-confounder_H = calculate_H(confounder)
-
-variables = ["y"]
-conditionants = ["x", "z"]
-confounder_rsq_both = rsquared(confounder_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_zy" : 1,
-         "beta_zx" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})
-    
-
-variables = ["y"]
-conditionants = ["x"]
-confounder_rsq_one = rsquared(confounder_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_zx" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})      
-    
-    
-# With magic
-
-collider = networkx.DiGraph()
-collider.add_nodes_from(["t", "x", "y", "u", "v"])
-
-collider.add_edges_from([("t", "y"),
-                  ("v", "x"),
-                  ("v", "y"),
-                  ("u", "x"),
-                  ("u", "t")])
-
-collider = populate_attributes(collider)
-collider_H = calculate_H(collider)
-
-variables = ["y"]
-conditionants = ["x", "t"]
-rsq = rsquared(collider_H, variables, conditionants)
-collider_rsq_both = rsquared(collider_H, variables, conditionants).subs( 
-        {"beta_z" : 0,
-         "beta_y" : 0,
-         "beta_x" : 0,
-         "beta_yz" : 1,
-         "sigma_z" : 1,
-         "sigma_x" : 1,
-         "sigma_y" : 1})    
+    return grand_sum
