@@ -102,10 +102,21 @@ def to_dag(G):
     G.graph["dependency_graph"] = H
     
 # This is the parameters() method.
-def parameters(G, responses = [], covariates = []):
-    
-    if(not responses): 
-        responses = get_order(G, covariates)
+def parameters(G, variables = [], conditionants = []):
+    """ Calculate the conditional mean vector and covariance matrix
+
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        variables: The variables in the regression. Can be more than one.
+        conditionants: The variables to condition on.
+
+    Returns:
+        A dictionary containing the theoretical conditional mean vector and
+        the theoretical conditional covariance matrix.
+        
+    """
+    if(not variables): 
+        variables = get_order(G, conditionants)
         
     H = G.graph["dependency_graph"]
     order = get_order(G)
@@ -114,46 +125,91 @@ def parameters(G, responses = [], covariates = []):
     for (i, j) in product(range(len(order)), range(len(order))):
         cov[i, j] = H.edges[(order[i], order[j])]["psi"]
 
-    if(not covariates):
-        return {"mean": mean_[variable_indices(G, responses, sort = True), 0], 
-                "cov": cov[variable_indices(G, responses, sort = True), 
-                           variable_indices(G, responses, sort = True)]}
+    if(not conditionants):
+        return {"mean": mean_[variable_indices(G, variables, sort = True), 0], 
+                "cov": cov[variable_indices(G, variables, sort = True), 
+                           variable_indices(G, variables, sort = True)]}
     
     V = get_order(G)
     
-    responses_indices = variable_indices(G, responses, sort = True)
-    covariates_indices = variable_indices(G, covariates, sort = True)
+    variables_indices = variable_indices(G, variables, sort = True)
+    conditionants_indices = variable_indices(G, conditionants, sort = True)
     
-    cov_AA = cov[responses_indices, responses_indices]
-    cov_AB = cov[responses_indices, covariates_indices]
-    cov_BA = cov[covariates_indices, responses_indices]
-    cov_BB_inv = sympy.Inverse(cov[covariates_indices, covariates_indices])
-    mean_A = sympy.Matrix([mean_[index] for index in responses_indices])
-    mean_B = sympy.Matrix([mean_[index] for index in covariates_indices])
+    cov_AA = cov[variables_indices, variables_indices]
+    cov_AB = cov[variables_indices, conditionants_indices]
+    cov_BA = cov[conditionants_indices, variables_indices]
+    cov_BB_inv = sympy.Inverse(cov[conditionants_indices, conditionants_indices])
+    mean_A = sympy.Matrix([mean_[index] for index in variables_indices])
+    mean_B = sympy.Matrix([mean_[index] for index in conditionants_indices])
 
-    new_mean = mean_A + cov_AB*cov_BB_inv*(sympy.Matrix(covariates) - mean_B)
+    new_mean = mean_A + cov_AB*cov_BB_inv*(sympy.Matrix(conditionants) - mean_B)
     new_cov  = cov_AA - cov_AB*cov_BB_inv*cov_BA
     return {"mean": sympy.simplify(new_mean), 
             "cov": sympy.simplify(new_cov)}
 
 # This is the mean() method.
-def mean(G, responses = [], covariates = []): 
-    return parameters(G, responses = responses, covariates = covariates)["mean"]
+def mean(G, variables = [], conditionants = []):
+    """ Calculate the conditional mean vector
+
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        variables: The variables in the regression. Can be more than one.
+        conditionants: The variables to condition on.
+
+    Returns:
+        The theoretical conditional mean vector
+        
+    """
+    return parameters(G, variables = variables, conditionants = conditionants)["mean"]
     
 # This is the covariance() method.
-def covariance(G, responses = [], covariates = []): 
-    return parameters(G, responses = responses, covariates = covariates)["cov"]
+def covariance(G, variables = [], conditionants = []): 
+    """ Calculate the conditional covariance matrix 
+
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        variables: The variables in the regression. Can be more than one.
+        conditionants: The variables to condition on.
+
+    Returns:
+        The theoretical conditional covariance matrix
+        
+    """
+    return parameters(G, variables = variables, conditionants  = conditionants )["cov"]
 
 # The variance method picks the only item from the covariance matrix.
-def variance(G, responses = [], covariates = []):
-    if len(responses) == 1:
-        return parameters(G, responses = responses, 
-                             covariates = covariates)["cov"][0]
+def variance(G, variables = [], conditionants = []):
+    """ Calculate the conditional covariance matrix 
+
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        variables: The variables in the regression. Can be more than one.
+        conditionants: The variables to condition on.
+
+    Returns:
+        The theoretical regression coefficient.
+        
+    """
+    if len(variables) == 1:
+        return parameters(G, variables = variables, 
+                             conditionants = conditionants)["cov"][0]
     else:
-        return parameters(G, responses = responses, 
-                             covariates = covariates)["cov"]
+        return parameters(G, variables = variables, 
+                             conditionants = conditionants)["cov"]
         
 def beta(G, responses = [], covariates = [], conditionants = []):
+    """ Calculate the theoretical beta coefficient of a regression
+
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        responses: The responses in the regression. Can be more than one.
+        covariates: The covariates of the regression. 
+        conditionants: The variables the regression is conditioned on.
+
+    Returns:
+        The theoretical regression coefficient.
+        
+    """
     variables = covariates + conditionants    
     
     conditional_means = mean(G, responses, variables)
@@ -184,23 +240,20 @@ def rsquared(G, responses, covariates, conditionants = [], norm = "trace"):
        determination. 
 
     Args:
-        G (DaGauss): A DaGauss object representing a multivariate normal.
-        responses: The 
+        G: A DaGauss object representing a multivariate normal.
+        responses: The responses in the regression. Can be more than one.
+        covariates: The covariates of the regression. 
+        conditionants: The variables the regression is conditioned on.
+        norm: Optional covariance matrix norm. Defaults to "trace", which is
+        recommended.
 
     Returns:
-        None: The function modifies G in place.
-
-    Examples:
-        Examples should be written in doctest format, and should illustrate how
-        to use the function.
-
-        >>> a = [1,2,3]
-        >>> print [x + 3 for x in a]
-        [4, 5, 6]
+        The caclulated R squared. A scalar sympy object.
+        
     """
     
-    cov = variance(G, responses = covariates, 
-                      covariates = conditionants)
+    cov = variance(G, variables = covariates, 
+                      conditionants = conditionants)
 
     betas = beta(G, responses = responses, 
                     covariates = covariates,
@@ -208,8 +261,8 @@ def rsquared(G, responses, covariates, conditionants = [], norm = "trace"):
 
     top = betas.T*cov*betas
     
-    bottom = covariance(G, responses = responses, 
-                           covariates = conditionants)
+    bottom = covariance(G, variables = responses, 
+                           conditionants = conditionants)
     
     if(norm == "trace"):
         return sympy.trace(top)/sympy.trace(bottom)
@@ -219,11 +272,21 @@ def rsquared(G, responses, covariates, conditionants = [], norm = "trace"):
 
 
 def correlation(G, variables = [], conditionants = []):
-    """ Calculates the conditional correlation between variable1 and variable2
-        given the conditionants. 
+    """ Calculates the conditional correlation.
+    
+    
+    Args:
+        G: A DaGauss object representing a multivariate normal.
+        variables: The variables you wish to find the correlation matrix for.
+        conditionants: The variables the correlation matrix is conditioned on.
+
+    Returns:
+        A correlation matrix.
 
     """
-    cov = covariance(G, variables, conditionants)
+    
+    cov = covariance(G, variables = variables, 
+                        conditionants = conditionants)
     k = cov.shape[0]
     sds = sympy.Matrix([1/sympy.sqrt(cov[i, i]) for i 
                         in range(0, k)]*k).reshape(k, k)
