@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from itertools import product
-import sympy
+import sympy as sp
 import networkx 
 import copy
 
@@ -64,10 +64,10 @@ def to_dag(G):
 
     """ Populates a directed graph G with attributes. """
     for node in G.nodes:
-        G.nodes[node]["beta"] = sympy.Symbol("beta_" + node, real = True )
-        G.nodes[node]["sigma"] = sympy.Symbol("sigma_" + node, positive = True)
+        G.nodes[node]["beta"] = sp.Symbol("beta_" + node, real = True )
+        G.nodes[node]["sigma"] = sp.Symbol("sigma_" + node, positive = True)
     for edge in G.edges:
-        G.edges[edge]["beta"] = sympy.Symbol("beta_" + edge[0] + edge[1], real = True)
+        G.edges[edge]["beta"] = sp.Symbol("beta_" + edge[0] + edge[1], real = True)
 
     H = G.to_undirected()
     # This loop takes care of the means of the unconditional model.
@@ -82,7 +82,7 @@ def to_dag(G):
         H.nodes[v]["mu"] = self_contribution + parent_contribution
 
     # This loop takes care of sigmas of the unconditional model.
-    for i, v in zip(range(0, len(V)), V):
+    for i, v in enumerate(V):
         edges = list(G.in_edges(v))
         vertices = [x for (x, _) in edges]
         product_edges = product(vertices, vertices)
@@ -120,8 +120,8 @@ def parameters(G, variables = [], conditionants = []):
         
     H = G.graph["dependency_graph"]
     order = get_order(G)
-    mean_ = sympy.Matrix([H.nodes[value]["mu"] for value in order])
-    cov = sympy.zeros(len(order), len(order))
+    mean_ = sp.Matrix([H.nodes[value]["mu"] for value in order])
+    cov = sp.zeros(len(order), len(order))
     for (i, j) in product(range(len(order)), range(len(order))):
         cov[i, j] = H.edges[(order[i], order[j])]["psi"]
 
@@ -138,14 +138,14 @@ def parameters(G, variables = [], conditionants = []):
     cov_AA = cov[variables_indices, variables_indices]
     cov_AB = cov[variables_indices, conditionants_indices]
     cov_BA = cov[conditionants_indices, variables_indices]
-    cov_BB_inv = sympy.Inverse(cov[conditionants_indices, conditionants_indices])
-    mean_A = sympy.Matrix([mean_[index] for index in variables_indices])
-    mean_B = sympy.Matrix([mean_[index] for index in conditionants_indices])
+    cov_BB_inv = sp.Inverse(cov[conditionants_indices, conditionants_indices])
+    mean_A = sp.Matrix([mean_[index] for index in variables_indices])
+    mean_B = sp.Matrix([mean_[index] for index in conditionants_indices])
 
-    new_mean = mean_A + cov_AB*cov_BB_inv*(sympy.Matrix(conditionants) - mean_B)
+    new_mean = mean_A + cov_AB*cov_BB_inv*(sp.Matrix(conditionants) - mean_B)
     new_cov  = cov_AA - cov_AB*cov_BB_inv*cov_BA
-    return {"mean": sympy.simplify(new_mean), 
-            "cov": sympy.simplify(new_cov)}
+    return {"mean": sp.simplify(new_mean), 
+            "cov": sp.simplify(new_cov)}
 
 # This is the mean() method.
 def mean(G, variables = [], conditionants = []):
@@ -160,7 +160,8 @@ def mean(G, variables = [], conditionants = []):
         The theoretical conditional mean vector
         
     """
-    return parameters(G, variables = variables, conditionants = conditionants)["mean"]
+    return parameters(G, variables = variables, 
+                         conditionants = conditionants)["mean"]
     
 # This is the covariance() method.
 def covariance(G, variables = [], conditionants = []): 
@@ -175,7 +176,8 @@ def covariance(G, variables = [], conditionants = []):
         The theoretical conditional covariance matrix
         
     """
-    return parameters(G, variables = variables, conditionants  = conditionants )["cov"]
+    return parameters(G, variables = variables, 
+                         conditionants  = conditionants )["cov"]
 
 # The variance method picks the only item from the covariance matrix.
 def variance(G, variables = [], conditionants = []):
@@ -190,12 +192,14 @@ def variance(G, variables = [], conditionants = []):
         The theoretical regression coefficient.
         
     """
-    if len(variables) == 1:
-        return parameters(G, variables = variables, 
-                             conditionants = conditionants)["cov"][0]
-    else:
-        return parameters(G, variables = variables, 
-                             conditionants = conditionants)["cov"]
+    
+    cov =  covariance(G, variables = variables, 
+                         conditionants = conditionants)
+    
+    if len(variables) == 1: 
+        return cov[0]
+    else: 
+        return cov
         
 def beta(G, responses = [], covariates = [], conditionants = []):
     """ Calculate the theoretical beta coefficient of a regression
@@ -212,18 +216,17 @@ def beta(G, responses = [], covariates = [], conditionants = []):
     """
     variables = covariates + conditionants    
     
-    conditional_means = mean(G, responses, variables)
+    means = mean(G, responses, variables)
     
     def collect(index):
-        expr = sympy.expand(conditional_means[index])
-        return sympy.collect(expr = expr, 
-                             syms = variables)
+        return sp.collect(expr = sp.expand(means[index]), 
+                          syms = variables)
         
-    collections = [collect(index) for index in range(len(conditional_means))]
+    collections = [collect(index) for index in range(len(means))]
     
-    betas = sympy.Matrix([collection.coeff(variables) for 
-                          collection, variables in 
-                          product(collections, variables)])
+    betas = sp.Matrix([collection.coeff(variables) 
+                       for collection, variables 
+                       in  product(collections, variables)])
     
     betas.reshape(len(collections), len(variables)).T
     
@@ -251,23 +254,23 @@ def rsquared(G, responses, covariates, conditionants = [], norm = "trace"):
         The caclulated R squared. A scalar sympy object.
         
     """
-    
-    cov = variance(G, variables = covariates, 
-                      conditionants = conditionants)
 
     betas = beta(G, responses = responses, 
                     covariates = covariates,
                     conditionants = conditionants)
 
-    top = betas.T*cov*betas
+    cov_covariates = variance(G, variables = covariates, 
+                                 conditionants = conditionants)
+        
+    cov_conditional = betas.T*cov_covariates*betas
     
-    bottom = covariance(G, variables = responses, 
-                           conditionants = conditionants)
+    cov_unconditional = covariance(G, variables = responses, 
+                                      conditionants = conditionants)
     
     if(norm == "trace"):
-        return sympy.trace(top)/sympy.trace(bottom)
+        return sp.trace(cov_conditional)/sp.trace(cov_unconditional)
     else:
-        return top.norm(norm)/bottom.norm(norm)
+        return cov_conditional.norm(norm)/cov_unconditional.norm(norm)
     
 
 
@@ -288,9 +291,9 @@ def correlation(G, variables = [], conditionants = []):
     cov = covariance(G, variables = variables, 
                         conditionants = conditionants)
     k = cov.shape[0]
-    sds = sympy.Matrix([1/sympy.sqrt(cov[i, i]) for i 
+    sds = sp.Matrix([1/sp.sqrt(cov[i, i]) for i 
                         in range(0, k)]*k).reshape(k, k)
     
     cor = cov.multiply_elementwise(sds).multiply_elementwise(sds.T)
-    return cor.applyfunc(sympy.simplify)
+    return cor.applyfunc(sp.simplify)
 
