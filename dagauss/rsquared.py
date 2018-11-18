@@ -22,7 +22,7 @@ def beta(G, responses = [], covariates = [], conditionants = []):
     
     return betas[indices, :]
 
-def rsquared(G, responses, covariates, conditionants = [], norm = None):
+def rsquared(G, responses, covariates, conditionants = [], norm = "trace"):
     """ Calculates the theoretical R squared. 
 
     This function calculates R squared, also known as the coefficient of 
@@ -56,7 +56,7 @@ def rsquared(G, responses, covariates, conditionants = [], norm = None):
     bottom = covariance(G, responses = responses, 
                            covariates = conditionants)
     
-    if(ord == "trace"):
+    if(norm == "trace"):
         return sympy.trace(top)/sympy.trace(bottom)
     else:
         return top.norm(norm)/bottom.norm(norm)
