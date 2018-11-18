@@ -2,19 +2,6 @@ import networkx
 from itertools import product
 
 G = networkx.DiGraph()
-G.add_nodes_from(["v", "w", "x", "y"])
-G.add_edges_from([("v", "x"),
-                  ("w", "y"),
-                  ("x", "y")])
-to_dag(G)
-
-responses = ["x", "y"]
-covariates = ["w"]
-conditionants = ["v"]
-conditionants = []
-rsqsign(G, responses, covariates)
-
-G = networkx.DiGraph()
 G.add_nodes_from(["x", "y", "z", "w"])
 G.add_edges_from([("x", "y"),
                   ("z", "x"),
@@ -37,14 +24,11 @@ subs =  {"beta_x"  : 0,
          "sigma_z" : 1,
          "sigma_w" : 1}
 
-rsqsign(G, responses, covariates).subs(subs)
-
-(sympy.simplify(A[:, 0].dot(B[:, 0]) + A[:, 1].dot(B[:, 1]))/(A.norm()*B.norm())).subs(subs)
-
 beta(G, responses, covariates)
 beta(G, covariates, responses)
 covariance(G, responses, covariates)
 covariance(G, covariates, responses)
+correlation(G, responses, covariates)
 rsquared(G, responses, covariates, conditionants).subs(subs)
 rsquared(G, covariates, responses, conditionants).subs(subs)
 
