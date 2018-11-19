@@ -65,10 +65,14 @@ covariates = ["x"]
 conditionants = ["z"]
 
 # beta gives the regression coefficent beta_xy when z is conditioned on.
-dg.beta(G, responses, covariates, conditionants)
+dg.beta(G, responses, covariates, conditionants)[0]
+# >>> beta_xy
 
 # The conditional variance of y and x given z:
 dg.covariance(G, responses + covariates, conditionants)
+# >>> Matrix([
+             [        sigma_x**2,                 beta_xy*sigma_x**2],
+             [beta_xy*sigma_x**2, beta_xy**2*sigma_x**2 + sigma_y**2]])
 ```
 
 We can go further and calculate the conditional correlation and conditional 
@@ -77,9 +81,11 @@ R squared.
 ```python
 # The conditional correlation of y and x given z:
 dg.correlation(G, responses + covariates, conditionants)[0, 1]
+# >>> beta_xy*sigma_x/sqrt(beta_xy**2*sigma_x**2 + sigma_y**2)
 
 # The rsquared of y ~ x | z.
 dg.rsquared(G, responses, covariates, conditionants)
+# >>> beta_xy**2*sigma_x**2/(beta_xy**2*sigma_x**2 + sigma_y**2)
 ```
 
 But we rarely wish to condition on `z`, as this keeps `z` from exerting its 
@@ -92,10 +98,16 @@ and its only parent is `z`. Using `sympy`'s `subs` function, we force
 
 ```python
 dg.beta(G, responses, covariates).subs({"beta_zx" : 0})
+# >>> beta_xy
 dg.covariance(G, responses + covariates).subs({"beta_zx" : 0})
-dg.correlation(G, responses + covariates).subs({"beta_zx" : 0})[0, 1]
+# >>> Matrix([
+             [        sigma_x**2,                                         beta_xy*sigma_x**2],
+             [beta_xy*sigma_x**2, beta_xy**2*sigma_x**2 + beta_zy**2*sigma_z**2 + sigma_y**2]])
 dg.rsquared(G, responses, covariates).subs({"beta_zx" : 0})
+# >>> beta_xy**2*sigma_x**2/(beta_xy**2*sigma_x**2 + beta_zy**2*sigma_z**2 + sigma_y**2)
 ```
+
+The R squared is smaller in this case, since it take the variance of `z` into account,
 
 # Development
 
