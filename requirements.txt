@@ -1,2 +1,4 @@
 networkx>=2.0
 sympy>=1.1.1
+pytest>=3.10.1
+tox>=2.3.1

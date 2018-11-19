@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Local windows scripts
+.bat
+
+# Local informal testing
+workspace/
