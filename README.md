@@ -1,7 +1,7 @@
 dagauss: Multivariate Gaussian DAGs
 ==========================
 
-*Note:* This software is in early development, as is not stable!
+*Note:* This software is in very early development. It has no stable interface.
 
 This module exists to help you investigate multivariate Gaussian DAGs 
 symbolically. 
