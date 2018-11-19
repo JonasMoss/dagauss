@@ -5,8 +5,6 @@ import sympy as sp
 import networkx 
 import copy
 
-sp.init_printing(use_unicode = True)
-
 # This should be made into a method.
 
 def get_order(G, values = [], keep = False):
