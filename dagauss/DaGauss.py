@@ -38,7 +38,7 @@ def variable_indices(G, values, restrictions = [], sort = False):
 
 # This is the ___init___ method.
     
-def to_dag(G):
+def to_dagauss(G):
     """ Calculate the unconditional mean vector of a multivariate normal DAG.
 
     This function calculates the mean vector of a multivariate normal DAG. It
