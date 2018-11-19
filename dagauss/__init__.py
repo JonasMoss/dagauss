@@ -1,1 +1,1 @@
-from DaGauss import *
+from dagauss.DaGauss import *
