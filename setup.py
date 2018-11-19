@@ -9,5 +9,5 @@ setup(name = 'dagauss',
       author = 'Jonas Moss',
       author_email = 'jonas.gjertsen@gmail.com',
       license = 'MIT',
-      packages = ['dagauss'],
+      packages = ['src/dagauss'],
       zip_safe = False)

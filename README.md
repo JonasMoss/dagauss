@@ -46,7 +46,11 @@ rsquared(G, responses, covariates, conditionants)
 ```
 
 # Installation
-Copy the scripts and use them.
+You can install it from the command line.
+
+```bash
+pip install https://github.com/django/django/archive/master.zip
+```
 
 # Documentation
 No documentation yet.
