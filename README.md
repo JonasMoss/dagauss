@@ -19,15 +19,18 @@ What happens to the estimate of regression coefficient of `x` on `y` when we do 
 
 ```python
 import networkx
+import dagauss as dg 
 
-# Add a DAG with confounder z.
+# Make a DAG with confounder z.
 
 G = networkx.DiGraph()
 G.add_nodes_from(["x", "y", "z"])
 G.add_edges_from([("x", "y"),
                   ("z", "x"),
                   ("z", "y")])
-to_dag(G)
+
+# Make G into a dagauss object:
+dg.to_dagauss(G)
 
 # Find some causal summaries of x on beta.
 
@@ -36,14 +39,17 @@ covariates = ["x"]
 conditionants = ["z"]
 
 # beta gives the regression coefficent beta_xy when z is conditioned on.
-beta(G, responses, covariates, conditionants)
+dg.beta(G, responses, covariates, conditionants)
 
 # The conditional variance of y and x given z:
-covariance(G, responses + covariates, conditionants)
+dg.covariance(G, responses + covariates, conditionants)
 
-# The R^2 of y ~ x | z.
-rsquared(G, responses, covariates, conditionants)
+# The rsquared of y ~ x | z.
+dg.rsquared(G, responses, covariates, conditionants)
 ```
+
+The interface of this package will change. There will be a `DaGauss` class and
+the functions above will be methods of the class.
 
 # Installation
 You can install it from the command line.
