@@ -5,7 +5,7 @@ import sympy as sp
 import networkx 
 import copy
 
-sympy.init_printing(use_unicode = True)
+sp.init_printing(use_unicode = True)
 
 # This should be made into a method.
 
