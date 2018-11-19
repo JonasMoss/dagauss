@@ -51,11 +51,13 @@ dg.to_dagauss(G)
 
 This creates a DAG where each node contains its own variance and mean, and each
 edge from "x" to "y" has a `beta_xy` coefficient, giving the conditional 
-regression coefficient of `y ~ x`.
+regression coefficient of `y ~ x`. Visually it's the same graph as the second 
+image above.
 
-Let's use this DAG to make compute the unconditional mean and covariance of 
-`y` and `x` given `z`. We are interested in these since we wish to measure the 
-causal effect of `x` on `y`, but this is confounded by `z` as it now stands.
+Let's use this DAG to make compute the conditional mean and covariance of 
+`y` and `x` given `z`. We could plausibly be interested in these since we 
+wish to measure the causal effect of `x` on `y`, but this is confounded 
+by `z` as it now stands.
 
 ```python
 responses = ["y"]
@@ -80,9 +82,9 @@ dg.correlation(G, responses + covariates, conditionants)[0, 1]
 dg.rsquared(G, responses, covariates, conditionants)
 ```
 
-A problem with this approach is that we rarely wish to condition on `z`, as 
-this keeps `z` from exerting its natural effect on the outcome variables. 
-What we want to do surgery on the DAG itself to get to the causal summaries. 
+But we rarely wish to condition on `z`, as this keeps `z` from exerting its 
+natural effect on the outcome variables. What we want to do surgery on the DAG 
+itself to get to the causal summaries. 
 This involves removing all the edges from the parents of the causal variables 
 to the causal variables themselves. In this case, the causal variable is `x` 
 and its only parent is `z`. Using `sympy`'s `subs` function, we force 
